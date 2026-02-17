@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📊 Simulador CLT/PJ - Sinalização E11/H11</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Roboto, sans-serif;
+        }
+        body {
+            margin: 0;
+            padding: 20px;
+            background: #f0f2f5;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            max-width: 1400px;
+            width: 100%;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+        }
+        h2 {
+            margin-top: 0;
+            color: #1a1a1a;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 10px;
+        }
+        .info {
+            background: #e8f0fe;
+            padding: 12px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+        .excel-table {
+            overflow-x: auto;
+            border: 1px solid #dadce0;
+            border-radius: 4px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            min-width: 1200px;
+            font-size: 14px;
+        }
+        th {
+            background: #f1f3f4;
+            padding: 10px 4px;
+            font-weight: 500;
+            border: 1px solid #dadce0;
+            text-align: center;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        td {
+            border: 1px solid #dadce0;
+            padding: 6px 8px;
+            height: 38px;
+        }
+        .row-number {
+            background: #f1f3f4;
+            font-weight: 500;
+            text-align: center;
+            width: 40px;
+            position: sticky;
+            left: 0;
+            z-index: 5;
+        }
+        .col-a {
+            background: #f1f3f4;
+            font-weight: 500;
+            white-space: nowrap;
+            position: sticky;
+            left: 40px;
+            z-index: 5;
+            min-width: 180px;
+        }
+        .editable {
+            background-color: #ffffff;
+            padding: 0;
+        }
+        .editable input {
+            width: 100%;
+            height: 100%;
+            border: 2px solid transparent;
+            padding: 6px 8px;
+            font-size: 14px;
+            font-weight: 500;
+            color: #0b57d0;
+            background: transparent;
+            outline: none;
+        }
+        .editable input:focus {
+            border-color: #1a73e8;
+            background: #eaf1fe;
+        }
+        .readonly {
+            background-color: #f8f9fa;
+        }
+        .negative {
+            color: #b3261e;
+        }
+        .formula-hint {
+            font-size: 10px;
+            color: #5f6368;
+            background: #e8eaed;
+            padding: 2px 4px;
+            border-radius: 2px;
+            margin-left: 4px;
+            font-family: monospace;
+        }
+        .footer-note {
+            margin-top: 16px;
+            font-size: 13px;
+            color: #5f6368;
+            text-align: center;
+            border-top: 1px solid #e0e0e0;
+            padding-top: 12px;
+        }
+
+        /* Estilos para sinalização de opção desvantajosa */
+        .desvantajosa {
+            background-color: #ffebee !important;
+            position: relative;
+            font-weight: bold;
+        }
+        
+        .desvantajosa .cell-content {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .desvantajosa .warning-icon {
+            color: #d32f2f;
+            font-size: 16px;
+            display: inline-block;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+        
+        .desvantajosa .warning-text {
+            color: #d32f2f;
+            font-size: 12px;
+            background: rgba(211, 47, 47, 0.1);
+            padding: 2px 6px;
+            border-radius: 12px;
+            white-space: nowrap;
+        }
+        
+        .tooltip {
+            position: relative;
+            cursor: help;
+        }
+        
+        .tooltip:hover::after {
+            content: "⬇️ Menor que o custo total CLT (E5)";
+            position: absolute;
+            background: #333;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            white-space: nowrap;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h2>📋 Simulador CLT → PJ (E11/H11 sinalizadas vs E5)</h2>
+    
+    <div class="info">
+        <strong>⚡ Edite apenas:</strong> B1, B4, B5, B6, B12<br>
+        <strong>🔴 Sinalização:</strong> E11 e H11 ficam vermelhas com ícone ⚠️ quando forem <strong>menores que E5</strong> (opção desvantajosa)
+    </div>
+
+    <div class="excel-table" id="table-container"></div>
+    
+    <div class="footer-note">
+        🔒 G11 = "TOTAL CUSTOS PJ 60%" • H11 soma H8:H10 • Sinalização automática de opção desvantajosa
+    </div>
+</div>
+
+<script>
+(function() {
+    // ========== DADOS INICIAIS ==========
+    const dadosIniciais = {
+        1: { B: 15000.0 }, 2: { B: 0 }, 3: { B: 0 }, 4: { B: 1000.0 },
+        5: { B: 1000.0 }, 6: { B: 400.0 }, 7: { B: 0 }, 8: { B: 0 },
+        9: { B: 0 }, 10: { B: 0 }, 11: { B: 0 }, 12: { B: 0.0 }
+    };
+
+    const EDITAVEIS = new Set([1, 4, 5, 6, 12]);
+
+    const rotulos = [
+        "CLT Bruto [DEFINA VALOR]", "IRPF", "INSS", "VALE [DEFINA VALOR]",
+        "SAUDE [DEFINA VALOR]", "CRECHE [DEFINA VALOR]", "FGTS", "40 PORC",
+        "FERIAS", "3 FERIAS", "DECIMO", "___________ [DEFINA VALOR]"
+    ];
+
+    let sheet = JSON.parse(JSON.stringify(dadosIniciais));
+
+    function calcIRPF(salario) {
+        if (salario <= 2259.20) return 0;
+        if (salario <= 2826.65) return salario * 0.075 - 169.44;
+        if (salario <= 3751.05) return salario * 0.15 - 381.44;
+        if (salario <= 4664.68) return salario * 0.225 - 662.77;
+        return salario * 0.275 - 896;
+    }
+
+    function calcINSS(salario) {
+        const faixa1 = 1412, faixa2 = 2666.68, faixa3 = 4000.03, faixa4 = 7786.02;
+        const p1 = 0.075, p2 = 0.09, p3 = 0.12, p4 = 0.14;
+        
+        if (salario <= faixa1) return salario * p1;
+        if (salario <= faixa2) return (faixa1 * p1) + ((salario - faixa1) * p2);
+        if (salario <= faixa3) return (faixa1 * p1) + (1254.68 * p2) + ((salario - faixa2) * p3);
+        if (salario <= faixa4) return (faixa1 * p1) + (1254.68 * p2) + (1333.35 * p3) + ((salario - faixa3) * p4);
+        return (faixa1 * p1) + (1254.68 * p2) + (1333.35 * p3) + ((7786.02 - faixa3) * p4);
+    }
+
+    function calcularTudo() {
+        const B1 = sheet[1]?.B ?? 0;
+
+        // --- B2: IRPF ---
+        sheet[2] = sheet[2] || {};
+        sheet[2].B = -calcIRPF(B1);
+
+        // --- B3: INSS ---
+        sheet[3] = sheet[3] || {};
+        sheet[3].B = -calcINSS(B1);
+
+        // --- E3: CLT LIQUIDO (EM CONTA) = SUM(B1:B3) ---
+        const cltLiquido = B1 + sheet[2].B + sheet[3].B;
+
+        // --- B7: FGTS = B1*0.08 ---
+        sheet[7] = sheet[7] || {};
+        sheet[7].B = B1 * 0.08;
+
+        // --- B8: 40 PORC = B7*0.4 ---
+        sheet[8] = sheet[8] || {};
+        sheet[8].B = sheet[7].B * 0.4;
+
+        // --- E7: SUPONDO PJ (CLT+50%) = B1*1.5 ---
+        const pj50 = B1 * 1.5;
+        
+        // --- H7: SUPONDO PJ (CLT+60%) = B1*1.6 ---
+        const pj60 = B1 * 1.6;
+
+        // --- B9: FERIAS = cltLiquido / 12 ---
+        sheet[9] = sheet[9] || {};
+        sheet[9].B = cltLiquido / 12;
+
+        // --- B10: 3 FERIAS = B9/3 ---
+        sheet[10] = sheet[10] || {};
+        sheet[10].B = sheet[9].B / 3;
+
+        // --- B11: DECIMO = cltLiquido / 12 ---
+        sheet[11] = sheet[11] || {};
+        sheet[11].B = cltLiquido / 12;
+
+        // --- E5: CLT TOTAL (TODOS BENEFICIOS) = SUM(B1:B12) ---
+        let somaB1aB12 = 0;
+        for (let i = 1; i <= 12; i++) {
+            somaB1aB12 += sheet[i]?.B ?? 0;
+        }
+
+        // --- E8: IMPOSTO 15% (sobre PJ 50%) = (E7*0.15)*-1 ---
+        const impostoPJ50 = (pj50 * 0.15) * -1;
+        
+        // --- H8: IMPOSTO 15% (sobre PJ 60%) = (H7*0.15)*-1 ---
+        const impostoPJ60 = (pj60 * 0.15) * -1;
+
+        // ===== ATRIBUIR VALORES ÀS CÉLULAS COM FÓRMULA =====
+
+        // --- H3: IMPOSTO 15% (linha 5, col H) = ((E3/0.85)-E3)*-1 ---
+        const impostoH3 = ((somaB1aB12 / 0.85) - somaB1aB12) * -1;
+        
+        // --- H4: INSS (linha 6, col H) = B3 ---
+        const inssH4 = sheet[3].B;
+
+        // --- H5: MINIMO SUGERIDO (linha 4, col H) = E3+(-1*H3)+(-1*H4) ---
+        const minimoSugerido = somaB1aB12 + (-1 * impostoH3) + (-1 * inssH4);
+        
+        // Linha 4
+        sheet[4] = sheet[4] || {};
+        sheet[4].E = cltLiquido;           // E3
+        sheet[4].H = minimoSugerido;        // H4 - MINIMO SUGERIDO
+        
+        // Linha 5
+        sheet[5] = sheet[5] || {};
+        sheet[5].E = somaB1aB12;            // E5
+        sheet[5].H = impostoH3;              // H3 - IMPOSTO 15%
+        
+        // Linha 6
+        sheet[6] = sheet[6] || {};
+        sheet[6].H = inssH4;                 // H4 - INSS
+        
+        // Linha 8
+        sheet[8] = sheet[8] || {};
+        sheet[8].E = pj50;                   // E7
+        sheet[8].H = pj60;                   // H7
+        
+        // Linha 9
+        sheet[9] = sheet[9] || {};
+        sheet[9].E = impostoPJ50;            // E8
+        sheet[9].H = impostoPJ60;            // H8
+        
+        // Linha 10
+        sheet[10] = sheet[10] || {};
+        sheet[10].E = sheet[3].B;            // E9 (INSS)
+        sheet[10].H = sheet[3].B;            // H9 (INSS)
+        
+        // Linha 11
+        sheet[11] = sheet[11] || {};
+        // E11 = SOMA(E8:E10)
+        const e8 = sheet[8]?.E ?? 0;
+        const e9 = sheet[9]?.E ?? 0;
+        const e10 = sheet[10]?.E ?? 0;
+        sheet[11].E = e8 + e9 + e10;          // E11 - SOMA DAS CÉLULAS E8, E9, E10
+        
+        // ===== FÓRMULA PARA H11 = SOMA(H8:H10) =====
+        const h8 = sheet[8]?.H ?? 0;   // H8 (imposto 15% PJ 60%)
+        const h9 = sheet[9]?.H ?? 0;   // H9 (INSS)
+        const h10 = sheet[10]?.H ?? 0; // H10 (INSS)
+        sheet[11].H = h8 + h9 + h10;    // H11 - SOMA H8, H9, H10
+    }
+
+    function formatarNumero(valor) {
+        return valor.toFixed(2).replace('.', ',');
+    }
+
+    function verificarDesvantajosa(valor, referencia) {
+        return valor < referencia;
+    }
+
+    function renderizar() {
+        calcularTudo();
+        
+        // Obter valor de referência E5 para comparação
+        const valorE5 = sheet[5]?.E ?? 0;
+        
+        let html = '<table><tr>';
+        html += '<th>#</th><th>A</th><th>B</th><th>C</th><th>D</th><th>E</th><th>F</th><th>G</th><th>H</th></tr>';
+        
+        for (let linha = 1; linha <= 12; linha++) {
+            html += '<tr>';
+            html += `<td class="row-number">${linha}</td>`;
+            html += `<td class="col-a">${rotulos[linha-1]}</td>`;
+            
+            // Coluna B
+            const isEditavel = EDITAVEIS.has(linha);
+            const valorB = sheet[linha]?.B ?? 0;
+            html += `<td class="${isEditavel ? 'editable' : 'readonly'}">`;
+            if (isEditavel) {
+                html += `<input type="number" step="any" value="${valorB}" 
+                    onchange="atualizarCelula(${linha}, 'B', this.value)"
+                    onkeypress="if(event.key==='Enter') this.blur()">`;
+            } else {
+                html += `<span class="${valorB < 0 ? 'negative' : ''}">${formatarNumero(valorB)}</span>`;
+                if ([2,3,7,8,9,10,11].includes(linha)) {
+                    html += '<span class="formula-hint">fórmula</span>';
+                }
+            }
+            html += '</td>';
+            
+            html += '<td class="readonly"></td>'; // Coluna C
+            
+            // Coluna D (rótulos)
+            let rotuloD = '';
+            if (linha === 4) rotuloD = 'CLT LIQUIDO (EM CONTA)';
+            else if (linha === 5) rotuloD = 'CLT TOTAL (TODOS BENEFICIOS)';
+            else if (linha === 8) rotuloD = 'SUPONDO PJ (CLT+50%)';
+            else if (linha === 9) rotuloD = 'IMPOSTO 15%';
+            else if (linha === 10) rotuloD = 'INSS';
+            else if (linha === 11) rotuloD = 'TOTAL CUSTOS PJ 50%';
+            html += `<td class="readonly">${rotuloD}</td>`;
+            
+            // Coluna E (valores calculados)
+            const valorE = sheet[linha]?.E;
+            const isEDesvantajosa = (linha === 11 && verificarDesvantajosa(valorE, valorE5));
+            
+            let classE = 'readonly';
+            if (isEDesvantajosa) classE += ' desvantajosa';
+            
+            html += `<td class="${classE}">`;
+            if (valorE !== undefined) {
+                html += '<div class="cell-content">';
+                if (isEDesvantajosa) {
+                    html += '<span class="warning-icon tooltip" title="⬇️ Opção desvantajosa - menor que E5">⚠️</span>';
+                }
+                html += `<span class="${valorE < 0 ? 'negative' : ''}">${formatarNumero(valorE)}</span>`;
+                if (linha === 11) {
+                    html += '<span class="formula-hint">SOMA(E8:E10)</span>';
+                }
+                if (isEDesvantajosa) {
+                    html += '<span class="warning-text">DESVANTAJOSA</span>';
+                }
+                html += '</div>';
+            }
+            html += '</td>';
+            
+            html += '<td class="readonly"></td>'; // Coluna F
+            
+            // Coluna G (rótulos)
+            let rotuloG = '';
+            if (linha === 4) rotuloG = 'MINIMO SUGERIDO';
+            else if (linha === 5) rotuloG = 'IMPOSTO 15%';
+            else if (linha === 6) rotuloG = 'INSS';
+            else if (linha === 8) rotuloG = 'SUPONDO PJ (CLT+60%)';
+            else if (linha === 9) rotuloG = 'IMPOSTO 15%';
+            else if (linha === 10) rotuloG = 'INSS';
+            else if (linha === 11) rotuloG = 'TOTAL CUSTOS PJ 60%';
+            html += `<td class="readonly">${rotuloG}</td>`;
+            
+            // Coluna H (valores calculados)
+            const valorH = sheet[linha]?.H;
+            const isHDesvantajosa = (linha === 11 && verificarDesvantajosa(valorH, valorE5));
+            
+            let classH = 'readonly';
+            if (isHDesvantajosa) classH += ' desvantajosa';
+            
+            html += `<td class="${classH}">`;
+            if (valorH !== undefined) {
+                html += '<div class="cell-content">';
+                if (isHDesvantajosa) {
+                    html += '<span class="warning-icon tooltip" title="⬇️ Opção desvantajosa - menor que E5">⚠️</span>';
+                }
+                html += `<span class="${valorH < 0 ? 'negative' : ''}">${formatarNumero(valorH)}</span>`;
+                if (linha === 11) {
+                    html += '<span class="formula-hint">SOMA(H8:H10)</span>';
+                }
+                if (isHDesvantajosa) {
+                    html += '<span class="warning-text">DESVANTAJOSA</span>';
+                }
+                html += '</div>';
+            }
+            html += '</td>';
+            
+            html += '</tr>';
+        }
+        
+        html += '</table>';
+        document.getElementById('table-container').innerHTML = html;
+    }
+
+    window.atualizarCelula = function(linha, coluna, valor) {
+        if (!sheet[linha]) sheet[linha] = {};
+        sheet[linha][coluna] = parseFloat(valor) || 0;
+        renderizar();
+    };
+
+    // Inicializar com B1=5000 para testar visualmente
+    sheet[1].B = 5000;
+    renderizar();
+})();
+</script>
+</body>
+</html>
